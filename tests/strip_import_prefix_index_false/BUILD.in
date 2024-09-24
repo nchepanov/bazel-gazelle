@@ -1,0 +1,2 @@
+# gazelle:lang proto
+# gazelle:proto_strip_import_prefix /prefix

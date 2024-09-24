@@ -19,5 +19,8 @@ def get_binary(target):
 
     if "loads_from_flag" in target:
         return ":gazelle_with_language_loads_from_flag"
+    
+    if "strip_import_prefix_index_false" in target:
+        return ":gazelle_with_proto"
 
     return ":gazelle"
