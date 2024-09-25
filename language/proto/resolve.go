@@ -35,9 +35,22 @@ func (*protoLang) Imports(c *config.Config, r *rule.Rule, f *rule.File) []resolv
 	rel := f.Pkg
 	srcs := r.AttrStrings("srcs")
 	imports := make([]resolve.ImportSpec, len(srcs))
-	pc := GetProtoConfig(c)
+	stripImportPrefix := r.AttrString("strip_import_prefix")
+	importPrefix := r.AttrString("import_prefix")
+	prefix, ok := massageImportPrefix(rel, stripImportPrefix, importPrefix)
+	if !ok {
+		return nil
+	}
+
+	for i, src := range srcs {
+		imports[i] = resolve.ImportSpec{Lang: "proto", Imp: path.Join(prefix, src)}
+	}
+	return imports
+}
+
+func massageImportPrefix(rel string, stripImportPrefix string, importPrefix string) (string, bool) {
 	prefix := rel
-	if stripImportPrefix := r.AttrString("strip_import_prefix"); stripImportPrefix != "" {
+	if stripImportPrefix != "" {
 		// If strip_import_prefix starts with a /, it's interpreted as being
 		// relative to the repository root. Otherwise, it's interpreted as being
 		// relative to the package directory.
@@ -53,21 +66,20 @@ func (*protoLang) Imports(c *config.Config, r *rule.Rule, f *rule.File) []resolv
 		if strings.HasPrefix(stripImportPrefix, "/") {
 			prefix = pathtools.TrimPrefix(rel, stripImportPrefix[len("/"):])
 		} else {
-			prefix = pathtools.TrimPrefix(rel, path.Join(rel, pc.StripImportPrefix))
+			prefix = pathtools.TrimPrefix(rel, path.Join(rel, stripImportPrefix))
 		}
+		// Stripped prefix is not a prefix of rel, so the rule won't be buildable.
+		// Don't index it.
 		if rel == prefix {
-			// Stripped prefix is not a prefix of rel, so the rule won't be buildable.
-			// Don't index it.
-			return nil
+			return "", false
 		}
 	}
-	if importPrefix := r.AttrString("import_prefix"); importPrefix != "" {
+
+	if importPrefix != "" {
 		prefix = path.Join(importPrefix, prefix)
 	}
-	for i, src := range srcs {
-		imports[i] = resolve.ImportSpec{Lang: "proto", Imp: path.Join(prefix, src)}
-	}
-	return imports
+
+	return prefix, true
 }
 
 func (*protoLang) Embeds(r *rule.Rule, from label.Label) []label.Label {
@@ -137,16 +149,23 @@ func resolveProto(c *config.Config, ix *resolve.RuleIndex, r *rule.Rule, imp str
 		}
 	}
 
-	if l, err := resolveWithIndex(c, ix, imp, from); err == nil || err == errSkipImport {
-		return l, err
-	} else if err != errNotFound {
-		return label.NoLabel, err
+	if c.IndexLibraries {
+		if l, err := resolveWithIndex(c, ix, imp, from); err == nil || err == errSkipImport {
+			return l, err
+		} else if err != errNotFound {
+			return label.NoLabel, err
+		}
 	}
+	// TODO: Not sure what the error case here would mean
+	fmt.Println("resolveProto", imp, r.AttrString("strip_import_prefix"), r.AttrString("import_prefix"))
+	prefixed, _ := massageImportPrefix(imp, r.AttrString("strip_import_prefix"), r.AttrString("import_prefix"))
+	fmt.Println("resolveProto", prefixed)
 
-	rel := path.Dir(imp)
+	rel := path.Dir(prefixed)
 	if rel == "." {
 		rel = ""
 	}
+	fmt.Println(rel)
 	name := RuleName(rel)
 	return label.New("", rel, name), nil
 }

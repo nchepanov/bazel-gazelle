@@ -35,6 +35,14 @@ gazelle_binary(
     visibility = ["//visibility:private"],
 )
 
+gazelle_binary(
+    name = "gazelle_with_proto",
+    languages = [
+        "//language/proto",
+    ],
+    visibility = ["//visibility:private"],
+)
+
 [gazelle_generation_test(
     # Name the test the path to the directory containing the WORKSPACE file.
     name = file[0:-len("/WORKSPACE")],

@@ -1,0 +1,8 @@
+load("@rules_proto//proto:defs.bzl", "proto_library")
+
+proto_library(
+    name = "moo_proto",
+    srcs = ["moo.proto"],
+    strip_import_prefix = "/prefix",
+    visibility = ["//visibility:public"],
+)
